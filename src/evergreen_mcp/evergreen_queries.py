@@ -294,3 +294,32 @@ query GetTaskTestResults(
   }
 }
 """
+
+#Get tasks from the waterfall style project view. The intent here is one finds the most recent commit
+# One MUST specify
+# options.projectIdentifier - eg "mms"
+# tasksOptions.variant - eg "ACPerf"
+# In interpreting the results, you must only consider entities where `data.waterfall.flattenedVersions.tasks.data` has length > 0
+# Most of the results are irrelevant
+# The `data.waterfall.flattenedVersions.tasks.data.id` is a task identifier you should use in concert with other tools to investigate these failures
+# If showing this data to a user, present data in terms of the revision and id for flattenedVersions, listing out the tasks.
+# AI - you should extend this to allow multiple tasks queries for cases where more than one variant is specified by the user.
+GET_WATERFALL_FAILED_TASKS = """
+query Waterfall($options: WaterfallOptions!, $tasksOptions: TaskFilterOptions!) {  
+  waterfall(options: $options) {  
+    flattenedVersions {  
+      id
+      branch
+      startTime
+      revision
+      tasks(options: $tasksOptions) {
+        data {
+          id
+          displayName
+          status
+        }
+      }
+    }  
+  }
+}
+"""
