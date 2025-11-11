@@ -17,6 +17,7 @@ from .failed_jobs_tools import (
     fetch_task_test_results,
     fetch_user_recent_patches,
 )
+from .waterfall_tools import fetch_waterfall_failed_tasks
 
 logger = logging.getLogger(__name__)
 
@@ -191,6 +192,60 @@ def get_tool_definitions() -> Sequence[types.Tool]:
                 "additionalProperties": False,
             },
         ),
+        types.Tool(
+            name="get_waterfall_failed_tasks_evergreen",
+            description=(
+                "Retrieve recent versions (flattened waterfall view) containing failed tasks "
+                "for one or more build variants in a project. Use this to identify the most "
+                "recent failing revisions and obtain task IDs for deeper log/test analysis."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "project_identifier": {
+                        "type": "string",
+                        "description": (
+                            "Evergreen project identifier (e.g. 'mms'). Required."
+                        ),
+                    },
+                    "variant": {
+                        "type": "string",
+                        "description": (
+                            "Single build variant to query (e.g. 'ACPerf'). Can be combined "
+                            "with 'variants' array; will be merged and deduplicated."
+                        ),
+                    },
+                    "variants": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "List of build variants to query. Provide multiple variants when "
+                            "investigating failures across platforms."
+                        ),
+                    },
+                    "waterfall_limit": {
+                        "type": "integer",
+                        "description": (
+                            "Maximum number of recent flattened versions to examine from the "
+                            "waterfall. This limits versions, not tasks."
+                        ),
+                        "default": 100,
+                        "minimum": 1,
+                        "maximum": 1000,
+                    },
+                    "statuses": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Task statuses to include. Defaults to failed/system-failed/task-timed-out."
+                        ),
+                        "default": ["failed", "system-failed", "task-timed-out"],
+                    },
+                },
+                "required": ["project_identifier"],
+                "additionalProperties": False,
+            },
+        ),
     ]
 
 
@@ -276,10 +331,30 @@ async def handle_get_task_test_results(
         ]
 
 
+async def handle_get_waterfall_failed_tasks(
+    arguments: Dict[str, Any], client
+) -> Sequence[types.TextContent]:
+    """Handle get_waterfall_failed_tasks_evergreen tool call"""
+    try:
+        result = await fetch_waterfall_failed_tasks(client, arguments)
+        return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
+    except Exception as e:
+        logger.error("Failed to fetch waterfall failed tasks: %s", e)
+        error_response = {
+            "error": str(e),
+            "tool": "get_waterfall_failed_tasks_evergreen",
+            "arguments": arguments,
+        }
+        return [
+            types.TextContent(type="text", text=json.dumps(error_response, indent=2))
+        ]
+
+
 # Tool handler registry for easy lookup
 TOOL_HANDLERS = {
     "list_user_recent_patches_evergreen": handle_list_user_recent_patches,
     "get_patch_failed_jobs_evergreen": handle_get_patch_failed_jobs,
     "get_task_logs_evergreen": handle_get_task_logs,
     "get_task_test_results_evergreen": handle_get_task_test_results,
+    "get_waterfall_failed_tasks_evergreen": handle_get_waterfall_failed_tasks,
 }

@@ -312,6 +312,7 @@ query Waterfall($options: WaterfallOptions!, $tasksOptions: TaskFilterOptions!) 
       branch
       startTime
       revision
+      finishTime
       tasks(options: $tasksOptions) {
         data {
           id

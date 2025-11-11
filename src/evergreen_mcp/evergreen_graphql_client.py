@@ -21,6 +21,7 @@ from .evergreen_queries import (
     GET_TASK_TEST_RESULTS,
     GET_USER_RECENT_PATCHES,
     GET_VERSION_WITH_FAILED_TASKS,
+    GET_WATERFALL_FAILED_TASKS,
 )
 
 # Constants for test status values
@@ -310,6 +311,115 @@ class EvergreenGraphQLClient:
         test_count = test_results.get("filteredTestCount", 0)
         logger.info("Retrieved %s test results for task %s", test_count, task_id)
         return task
+
+    async def get_waterfall_failed_tasks(
+        self,
+        project_identifier: str,
+        variants: List[str],
+        statuses: Optional[List[str]] = None,
+        waterfall_limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """Return the most recent failing version (single condensed entry).
+
+        Original inline comments required:
+        - reject all versions that do not have both startTime and finishTime
+        - sort by startTime (descending, most recent first)
+        - for first entry that has failures: condense and return failures only
+
+        This implements exactly that contract. Although we still query each variant
+        separately (schema limitation), we now produce a SINGLE most recent failing
+        version object with merged unique failed tasks across all queried variants.
+
+        Args:
+            project_identifier: Evergreen project identifier
+            variants: Build variants to inspect
+            statuses: Failure statuses (defaults typical failed states)
+            waterfall_limit: Max versions fetched per variant (client-side filter still applied)
+
+        Returns:
+            List with 0 or 1 version dict containing merged failed tasks.
+        """
+        if not variants:
+            raise ValueError("At least one variant must be provided")
+
+        statuses = statuses or ["failed", "system-failed", "task-timed-out"]
+
+        merged_tasks_by_version: Dict[str, Dict[str, Any]] = {}
+        for variant in variants:
+            variables = {
+                "options": {
+                    "projectIdentifier": project_identifier,
+                    "limit": waterfall_limit,
+                },
+                "tasksOptions": {
+                    "variant": variant,
+                    "statuses": statuses,
+                },
+            }
+            try:
+                result = await self._execute_query(GET_WATERFALL_FAILED_TASKS, variables)
+            except Exception as e:
+                logger.error(
+                    "Error fetching waterfall failed tasks for variant %s: %s", variant, e
+                )
+                raise
+
+            waterfall = result.get("waterfall", {})
+            versions = waterfall.get("flattenedVersions", [])
+            for version in versions:
+                # Require both startTime and finishTime as per requirement
+                if not version.get("startTime") or not version.get("finishTime"):
+                    continue
+                # Extract task list cleanly (avoid nested inline parentheses obscuring intent)
+                tasks_obj = version.get("tasks")
+                if not tasks_obj:
+                    continue
+                tasks_list = tasks_obj.get("data") or []
+                if not tasks_list:
+                    continue
+                version_id = version.get("id") or "unknown"
+                entry = merged_tasks_by_version.get(version_id)
+                if not entry:
+                    entry = {
+                        "id": version_id,
+                        "revision": version.get("revision"),
+                        "branch": version.get("branch"),
+                        "startTime": version.get("startTime"),
+                        "finishTime": version.get("finishTime"),
+                        "tasks": [],
+                        "variants": set(),
+                    }
+                    merged_tasks_by_version[version_id] = entry
+                # Merge tasks uniquely
+                known_ids = {t.get("id") for t in entry["tasks"]}
+                for task in tasks_list:
+                    tid = task.get("id")
+                    if tid in known_ids:
+                        continue
+                    entry["tasks"].append(task)
+                entry["variants"].add(variant)
+
+        if not merged_tasks_by_version:
+            logger.info(
+                "No failing versions found for project %s variants %s", project_identifier, variants
+            )
+            return []
+
+        # Select most recent by startTime
+        most_recent = max(
+            merged_tasks_by_version.values(), key=lambda v: v.get("startTime", "")
+        )
+        # Convert variants set to list for serialization
+        most_recent["variants"] = sorted(list(most_recent["variants"]))
+
+        logger.info(
+            "Selected most recent failing version %s for project %s variants %s with %s tasks",
+            most_recent.get("id"),
+            project_identifier,
+            variants,
+            len(most_recent.get("tasks", [])),
+        )
+        return [most_recent]
 
     async def __aenter__(self):
         """Async context manager entry"""

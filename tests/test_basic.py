@@ -26,6 +26,7 @@ class TestMCPTools(unittest.TestCase):
             "get_patch_failed_jobs_evergreen",
             "get_task_logs_evergreen",
             "get_task_test_results_evergreen",
+            "get_waterfall_failed_tasks_evergreen",
         ]
 
         for expected_tool in expected_tools:
@@ -97,6 +98,7 @@ class TestImports(unittest.TestCase):
                 "GET_PATCH_FAILED_TASKS",
                 "GET_TASK_LOGS",
                 "GET_TASK_TEST_RESULTS",
+                "GET_WATERFALL_FAILED_TASKS",
             ]
             for query in expected_queries:
                 self.assertTrue(
