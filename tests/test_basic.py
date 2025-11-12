@@ -27,6 +27,7 @@ class TestMCPTools(unittest.TestCase):
             "get_task_logs_evergreen",
             "get_task_test_results_evergreen",
             "get_waterfall_failed_tasks_evergreen",
+            "download_task_artifacts_evergreen",
         ]
 
         for expected_tool in expected_tools:

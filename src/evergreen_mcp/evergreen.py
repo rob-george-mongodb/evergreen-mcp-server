@@ -8,14 +8,36 @@ from typing import Dict, Optional
 from urllib.parse import urlparse
 
 import httpx
+import yaml
 
 from evergreen_mcp.models import TaskResponse
 
 
 logger = logging.getLogger(__name__)
 
+
+def get_config():
+    """Get Evergreen configuration from environment variables or config file."""
+    # Check for environment variables first (Docker setup)
+    evergreen_user = os.getenv("EVERGREEN_USER")
+    evergreen_api_key = os.getenv("EVERGREEN_API_KEY")
+
+    if evergreen_user and evergreen_api_key:
+        # Use environment variables (Docker setup)
+        logger.info("Using environment variables for Evergreen configuration")
+        return {
+            "user": evergreen_user,
+            "api_key": evergreen_api_key,
+        }
+    else:
+        # Fall back to config file (local setup)
+        logger.info("Using ~/.evergreen.yml for Evergreen configuration")
+        with open(os.path.expanduser("~/.evergreen.yml"), mode="rb") as f:
+            evergreen_config = yaml.safe_load(f)
+        return evergreen_config
+
 def get_api_user(api_user: Optional[str] = None) -> Optional[str]:
-    """Get the API user from parameter or environment variable.
+    """Get the API user from parameter or config.
 
     Args:
         api_user: Optional API user parameter
@@ -26,8 +48,9 @@ def get_api_user(api_user: Optional[str] = None) -> Optional[str]:
     if api_user:
         return api_user
 
-    #TODO - change to be compatible w the offical MCP  convention
-    return os.environ.get("EVERGREEN_API_USER")
+    # Use the same config as the MCP server convention
+    config = get_config()
+    return config.get("user")
 
 
 def download_task_artifacts(
@@ -97,7 +120,8 @@ def download_task_artifacts(
     logger.info(f"Created artifacts directory: {artifacts_dir}")
 
     # Get API key for downloading
-    evergreen_api_key = os.environ.get("EVERGREEN_API_KEY")
+    config = get_config()
+    evergreen_api_key = config["api_key"]
     if not evergreen_api_key:
         raise ValueError("EVERGREEN_API_KEY environment variable not set")
 
@@ -128,7 +152,7 @@ def download_task_artifacts(
 
             # Download the artifact
             headers = {"Api-Key": evergreen_api_key}
-            user = get_api_user(api_user)
+            user = api_user or config["user"]
             if user:
                 headers["Api-User"] = user
             with httpx.Client(timeout=60) as client:
@@ -183,12 +207,13 @@ def get_task_details(
     api_url = f"https://evergreen.mongodb.com/rest/v2/tasks/{task_id}"
 
     # Get API key from environment
-    evergreen_api_key = os.environ.get("EVERGREEN_API_KEY")
+    config = get_config()
+    evergreen_api_key = config["api_key"]
     if not evergreen_api_key:
         raise ValueError("EVERGREEN_API_KEY environment variable not set")
 
     # Get API user
-    api_user = get_api_user(api_user)
+    api_user = api_user or config["user"]
 
     # Set up headers and params
     headers = {"Api-Key": evergreen_api_key}
