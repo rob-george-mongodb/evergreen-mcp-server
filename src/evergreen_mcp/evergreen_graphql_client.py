@@ -368,7 +368,9 @@ class EvergreenGraphQLClient:
             versions = waterfall.get("flattenedVersions", [])
             for version in versions:
                 # Require both startTime and finishTime as per requirement
-                if not version.get("startTime") or not version.get("finishTime"):
+                #TODO - find better ways of getting these data - the waterfall
+                # entity is not conducive to this.
+                if not version.get("startTime"):
                     continue
                 # Extract task list cleanly (avoid nested inline parentheses obscuring intent)
                 tasks_obj = version.get("tasks")

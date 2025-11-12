@@ -52,25 +52,14 @@ cd evergreen-mcp-server
 
 ### 2. Set Up Python Environment
 
-```bash
-# Create a virtual environment
-python -m venv .venv
+Use a venv wrangler of your choice. These docs use uv https://docs.astral.sh/uv/#installation, and a lockfile for consistent dependency resolution is included
 
-# Activate the virtual environment
-# On macOS/Linux:
-source .venv/bin/activate
-# On Windows:
-# .venv\Scripts\activate
 ```
-
-### 3. Install Dependencies
-
-```bash
-# Install the package
-pip install -e .
-
-# For development (includes testing dependencies)
-pip install -e ".[dev]"
+uv venv -p 3.14
+# install runtime packages
+uv pip install ./
+#install additional dev/test dependencies - optional
+uv pip install -e ".[dev]"
 ```
 
 ## Configuration

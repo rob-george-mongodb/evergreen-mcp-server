@@ -230,7 +230,7 @@ def get_tool_definitions() -> Sequence[types.Tool]:
                             "Maximum number of recent flattened versions to examine from the "
                             "waterfall. This limits versions, not tasks."
                         ),
-                        "default": 100,
+                        "default": 200,
                         "minimum": 1,
                         "maximum": 1000,
                     },
