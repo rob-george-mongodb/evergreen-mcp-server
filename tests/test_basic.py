@@ -72,8 +72,21 @@ class TestImports(unittest.TestCase):
             from evergreen_mcp import server
 
             self.assertTrue(hasattr(server, "main"), "Server should have main function")
+            self.assertTrue(hasattr(server, "mcp"), "Server should have mcp instance")
         except ImportError as e:
             self.fail(f"Failed to import server module: {e}")
+
+    def test_import_tools(self):
+        """Test that tools module can be imported"""
+        try:
+            from evergreen_mcp import mcp_tools
+
+            self.assertTrue(
+                hasattr(mcp_tools, "register_tools"),
+                "Tools module should have register_tools function",
+            )
+        except ImportError as e:
+            self.fail(f"Failed to import tools module: {e}")
 
     def test_import_graphql_client(self):
         """Test that GraphQL client can be imported"""
@@ -109,6 +122,37 @@ class TestImports(unittest.TestCase):
         except ImportError as e:
             self.fail(f"Failed to import evergreen_queries: {e}")
 
+    def test_import_failed_jobs_tools(self):
+        """Test that failed_jobs_tools module can be imported"""
+        try:
+            from evergreen_mcp import failed_jobs_tools
+
+            # Check that expected functions exist
+            expected_functions = [
+                "fetch_user_recent_patches",
+                "fetch_patch_failed_jobs",
+                "fetch_task_logs",
+                "fetch_task_test_results",
+            ]
+            for func in expected_functions:
+                self.assertTrue(
+                    hasattr(failed_jobs_tools, func),
+                    f"Function {func} should be defined",
+                )
+        except ImportError as e:
+            self.fail(f"Failed to import failed_jobs_tools: {e}")
+
+    def test_import_oidc_auth(self):
+        """Test that OIDC auth module can be imported"""
+        try:
+            from evergreen_mcp.oidc_auth import OIDCAuthManager
+
+            self.assertIsNotNone(
+                OIDCAuthManager, "OIDCAuthManager should be importable"
+            )
+        except ImportError as e:
+            self.fail(f"Failed to import OIDCAuthManager: {e}")
+
 
 class TestVersion(unittest.TestCase):
     """Test version constant"""
@@ -125,11 +169,11 @@ class TestVersion(unittest.TestCase):
         """Test that version follows expected format"""
         from evergreen_mcp import __version__
 
-        # Version should be in format like "0.1.0"
+        # Version should be in format like "0.4.0"
         self.assertRegex(
             __version__,
             r"^\d+\.\d+\.\d+$",
-            "Version should follow semantic versioning format (e.g., 0.1.0)",
+            "Version should follow semantic versioning format (e.g., 0.4.0)",
         )
 
 
@@ -188,6 +232,22 @@ class TestUserAgent(unittest.TestCase):
             r"^evergreen-mcp-server/\d+\.\d+\.\d+$",
             "User-Agent should be in format 'evergreen-mcp-server/x.y.z'",
         )
+
+
+class TestServerComponents(unittest.TestCase):
+    """Test server components are properly configured"""
+
+    def test_fastmcp_server_created(self):
+        """Test that FastMCP server instance is created"""
+        from evergreen_mcp.server import mcp
+
+        self.assertIsNotNone(mcp, "MCP server instance should exist")
+
+    def test_server_has_lifespan(self):
+        """Test that server has lifespan configured"""
+        from evergreen_mcp.server import lifespan
+
+        self.assertIsNotNone(lifespan, "Lifespan function should be defined")
 
 
 if __name__ == "__main__":

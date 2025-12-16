@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_FAILED_STATUSES = ["failed", "system-failed", "task-timed-out"]
 
-
 async def fetch_waterfall_failed_tasks(
     client,
     arguments: Dict[str, Any],
