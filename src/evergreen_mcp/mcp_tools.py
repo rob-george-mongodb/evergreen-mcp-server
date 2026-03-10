@@ -6,10 +6,9 @@ Tools are registered with the FastMCP server instance.
 
 import json
 import logging
-from typing import Annotated, Any, Dict, Sequence
-from fastmcp import Context, FastMCP
+from typing import Annotated
 
-import mcp.types as types
+from fastmcp import Context, FastMCP
 
 from .evergreen import download_task_artifacts
 from .failed_jobs_tools import (
@@ -187,7 +186,7 @@ def register_tools(mcp: FastMCP) -> None:
 
         result = await fetch_task_test_results(evg_ctx.client, arguments)
         return json.dumps(result, indent=2)
-    
+
     @mcp.tool(
         description=(
             "Retrieve recent versions (flattened waterfall view) containing failed tasks "
@@ -284,151 +283,4 @@ def register_tools(mcp: FastMCP) -> None:
 
         return json.dumps(response, indent=2)
 
-
-    logger.info("Registered %d tools with FastMCP server why", 600)
-
-
-async def handle_list_user_recent_patches(
-    arguments: Dict[str, Any], client, user_id: str
-) -> Sequence[types.TextContent]:
-    """Handle list_user_recent_patches_evergreen tool call"""
-    try:
-        limit = arguments.get("limit", 10)
-        result = await fetch_user_recent_patches(client, user_id, limit)
-        return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
-    except Exception as e:
-        logger.error("Failed to fetch user patches: %s", e)
-        error_response = {
-            "error": str(e),
-            "tool": "list_user_recent_patches_evergreen",
-            "arguments": arguments,
-        }
-        return [
-            types.TextContent(type="text", text=json.dumps(error_response, indent=2))
-        ]
-
-
-async def handle_get_patch_failed_jobs(
-    arguments: Dict[str, Any], client
-) -> Sequence[types.TextContent]:
-    """Handle get_patch_failed_jobs_evergreen tool call"""
-    try:
-        patch_id = arguments.get("patch_id")
-        if not patch_id:
-            raise ValueError("patch_id parameter is required")
-
-        max_results = arguments.get("max_results", 50)
-        result = await fetch_patch_failed_jobs(client, patch_id, max_results)
-        return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
-    except Exception as e:
-        logger.error("Failed to fetch patch failed jobs: %s", e)
-        error_response = {
-            "error": str(e),
-            "tool": "get_patch_failed_jobs_evergreen",
-            "arguments": arguments,
-        }
-        return [
-            types.TextContent(type="text", text=json.dumps(error_response, indent=2))
-        ]
-
-
-async def handle_get_task_logs(
-    arguments: Dict[str, Any], client
-) -> Sequence[types.TextContent]:
-    """Handle get_task_logs_evergreen tool call"""
-    try:
-        result = await fetch_task_logs(client, arguments)
-        return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
-    except Exception as e:
-        logger.error("Failed to fetch task logs: %s", e)
-        error_response = {
-            "error": str(e),
-            "tool": "get_task_logs_evergreen",
-            "arguments": arguments,
-        }
-        return [
-            types.TextContent(type="text", text=json.dumps(error_response, indent=2))
-        ]
-
-
-async def handle_get_task_test_results(
-    arguments: Dict[str, Any], client
-) -> Sequence[types.TextContent]:
-    """Handle get_task_test_results_evergreen tool call"""
-    try:
-        result = await fetch_task_test_results(client, arguments)
-        return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
-    except Exception as e:
-        logger.error("Failed to fetch task test results: %s", e)
-        error_response = {
-            "error": str(e),
-            "tool": "get_task_test_results_evergreen",
-            "arguments": arguments,
-        }
-        return [
-            types.TextContent(type="text", text=json.dumps(error_response, indent=2))
-        ]
-
-
-async def handle_get_waterfall_failed_tasks(
-    arguments: Dict[str, Any], client
-) -> Sequence[types.TextContent]:
-    """Handle get_waterfall_failed_tasks_evergreen tool call"""
-    try:
-        result = await fetch_waterfall_failed_tasks(client, arguments)
-        return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
-    except Exception as e:
-        logger.error("Failed to fetch waterfall failed tasks: %s", e)
-        error_response = {
-            "error": str(e),
-            "tool": "get_waterfall_failed_tasks_evergreen",
-            "arguments": arguments,
-        }
-        return [
-            types.TextContent(type="text", text=json.dumps(error_response, indent=2))
-        ]
-
-
-async def handle_download_task_artifacts(
-    arguments: Dict[str, Any], client
-) -> Sequence[types.TextContent]:
-    """Handle download_task_artifacts_evergreen tool call"""
-    try:
-        task_id = arguments.get("task_id")
-        if not task_id:
-            raise ValueError("task_id parameter is required")
-
-        artifact_filter = arguments.get("artifact_filter")
-        work_dir = arguments.get("work_dir", "WORK")
-
-        # Call the download function
-        result = download_task_artifacts(
-            task_id=task_id,
-            artifact_filter=artifact_filter,
-            work_dir=work_dir,
-        )
-
-        # Convert Path objects to strings for JSON serialization
-        serializable_result = {}
-        for artifact_name, path in result.items():
-            serializable_result[artifact_name] = str(path)
-
-        response = {
-            "task_id": task_id,
-            "artifact_filter": artifact_filter,
-            "work_dir": work_dir,
-            "downloaded_artifacts": serializable_result,
-            "artifact_count": len(serializable_result),
-        }
-
-        return [types.TextContent(type="text", text=json.dumps(response, indent=2))]
-    except Exception as e:
-        logger.error("Failed to download task artifacts: %s", e)
-        error_response = {
-            "error": str(e),
-            "tool": "download_task_artifacts_evergreen",
-            "arguments": arguments,
-        }
-        return [
-            types.TextContent(type="text", text=json.dumps(error_response, indent=2))
-        ]
+    logger.info("Registered %d tools with FastMCP server", 6)

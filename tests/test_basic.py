@@ -6,61 +6,7 @@ These tests validate individual components without requiring Evergreen credentia
 """
 
 import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
-
-from evergreen_mcp.mcp_tools import TOOL_HANDLERS, get_tool_definitions
-
-
-class TestMCPTools(unittest.TestCase):
-    """Test MCP tool definitions and handlers"""
-
-    def test_tool_definitions_exist(self):
-        """Test that tool definitions are properly defined"""
-        tools = get_tool_definitions()
-        self.assertGreater(len(tools), 0, "Should have at least one tool defined")
-
-        # Check that all expected tools are present
-        tool_names = [tool.name for tool in tools]
-        expected_tools = [
-            "list_user_recent_patches_evergreen",
-            "get_patch_failed_jobs_evergreen",
-            "get_task_logs_evergreen",
-            "get_task_test_results_evergreen",
-            "get_waterfall_failed_tasks_evergreen",
-            "download_task_artifacts_evergreen",
-        ]
-
-        for expected_tool in expected_tools:
-            self.assertIn(
-                expected_tool, tool_names, f"Tool {expected_tool} should be defined"
-            )
-
-    def test_tool_handlers_exist(self):
-        """Test that all tool handlers are properly registered"""
-        tools = get_tool_definitions()
-
-        for tool in tools:
-            self.assertIn(
-                tool.name,
-                TOOL_HANDLERS,
-                f"Handler for tool {tool.name} should be registered",
-            )
-            self.assertIsNotNone(
-                TOOL_HANDLERS[tool.name],
-                f"Handler for tool {tool.name} should not be None",
-            )
-
-    def test_tool_definitions_have_required_fields(self):
-        """Test that tool definitions have all required fields"""
-        tools = get_tool_definitions()
-
-        for tool in tools:
-            self.assertIsNotNone(tool.name, "Tool should have a name")
-            self.assertIsNotNone(tool.description, "Tool should have a description")
-            self.assertGreater(len(tool.name), 0, "Tool name should not be empty")
-            self.assertGreater(
-                len(tool.description), 0, "Tool description should not be empty"
-            )
+from unittest.mock import patch
 
 
 class TestImports(unittest.TestCase):
