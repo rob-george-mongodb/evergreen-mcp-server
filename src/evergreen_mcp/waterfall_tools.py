@@ -110,8 +110,7 @@ async def fetch_waterfall_failed_tasks(
             "total_failed_tasks": len(processed_tasks),
             "variants": variants,
             "suggested_next_steps": [
-                "Invoke get_task_logs_evergreen on a task_id to inspect errors",
-                "Invoke get_task_test_results_evergreen on tasks suspected of test failures",
+                "Invoke download_task_artifacts_evergreen - consult your prompt for guidance on what files may be relevant. Do not blindly look at the artifacts. They may be very large and are a danger to your context window.",
             ],
         },
     }

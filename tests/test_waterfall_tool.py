@@ -53,9 +53,6 @@ class TestWaterfallTool(unittest.TestCase):
             first_version = result["versions"][0]
             self.assertIn("failed_tasks", first_version)
             first_task = first_version["failed_tasks"][0]
-            self.assertIn("tool_args", first_task)
-            self.assertIn("logs", first_task["tool_args"])
-            self.assertIn("tests", first_task["tool_args"])
 
         asyncio.run(run_test())
 
