@@ -26,6 +26,7 @@ from .failed_jobs_tools import (
     fetch_user_recent_patches,
     infer_project_id_from_context,
 )
+from .waterfall_tools import DEFAULT_FAILED_STATUSES, fetch_waterfall_failed_tasks
 
 logger = logging.getLogger(__name__)
 
@@ -416,6 +417,68 @@ def register_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(
         description=(
+            "Retrieve recent versions (flattened waterfall view) containing failed tasks "
+            "for one or more build variants in a project. Use this to identify the most "
+            "recent failing revisions and obtain task IDs for deeper log/test analysis."
+        )
+    )
+    async def get_waterfall_failed_tasks_evergreen(
+        ctx: Context,
+        project_identifier: Annotated[
+            str,
+            "Evergreen project identifier (e.g. 'mms'). Required.",
+        ],
+        variant: Annotated[
+            str | None,
+            "Single build variant to query (e.g. 'ACPerf'). Can be combined with 'variants' list.",
+        ] = None,
+        variants: Annotated[
+            list[str] | None,
+            "List of build variants to query. Provide multiple variants when investigating failures across platforms.",
+        ] = None,
+        waterfall_limit: Annotated[
+            int,
+            "Maximum number of recent flattened versions to examine from the waterfall. Limits versions, not tasks. Defaults to 200.",
+        ] = 200,
+        statuses: Annotated[
+            list[str] | None,
+            "Task statuses to include. Defaults to ['failed','system-failed','task-timed-out']. You may also include setup-failed",
+        ] = None,
+        bearer_token: Annotated[
+            str | None,
+            "Override with a bearer token for this request. If not provided, uses the server's default credentials.",
+        ] = None,
+    ) -> str:
+        """Get flattened waterfall recent versions containing failed tasks."""
+        evg_ctx = ctx.request_context.lifespan_context
+
+        # merge variant(s) into a deduplicated list
+        variant_set: set[str] = set()
+        if variant:
+            variant_set.add(variant)
+        if variants:
+            variant_set.update(variants)
+        variant_list = list(variant_set) if variant_set else None
+
+        effective_statuses = statuses or DEFAULT_FAILED_STATUSES
+
+        arguments = {
+            "project_identifier": project_identifier,
+            "variants": variant_list,
+            "waterfall_limit": waterfall_limit,
+            "statuses": effective_statuses,
+        }
+
+        async with _get_clients(evg_ctx, bearer_token=bearer_token) as (
+            client,
+            api_client,
+            user_id,
+        ):
+            result = await fetch_waterfall_failed_tasks(client, arguments)
+        return json.dumps(result, indent=2)
+
+    @mcp.tool(
+        description=(
             "Get a list of unique project identifiers inferred from the user's "
             "recent patches. This helps discover which Evergreen projects the user "
             "has been working on, sorted by activity (patch count and recency). "
@@ -584,4 +647,4 @@ def register_tools(mcp: FastMCP) -> None:
             )
         return json.dumps(result, indent=2)
 
-    logger.info("Registered %d tools with FastMCP server", 8)
+    logger.info("Registered %d tools with FastMCP server", 9)

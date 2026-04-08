@@ -18,11 +18,25 @@ A Model Context Protocol (MCP) server that provides access to the Evergreen CI/C
 - **Task Log Retrieval**: Get detailed logs for failed tasks with error filtering
 - **REST API Log Analysis**: Full untruncated task and test logs via REST API with automatic error pattern scanning
 - **Stepback Analysis**: Find failed mainline tasks that have undergone stepback bisection
+- **Waterfall Investigation CLI**: Launch one `opencode` investigation per open waterfall failure streak using git worktrees
+- **Investigation Cleanup CLI**: Remove generated investigation worktrees and optional branches safely
 - **Authentication**: Secure OIDC-based authentication via `evergreen login`
 - **Async Operations**: Built on asyncio for efficient concurrent operations
 - **GraphQL + REST Integration**: Uses Evergreen's GraphQL API for metadata and REST API for full log content
 
 ## Quick Start
+
+## Local Investigation CLIs
+
+This repo also ships local helper CLIs for waterfall-based E2E investigation:
+
+```bash
+uv run evergreen-waterfall-triage --projectIdentifier mms --variant linux
+uv run evergreen-waterfall-investigate launch --triageJson qaFailures.json --targetRepoPath ~/git/mms --dryRun
+uv run evergreen-waterfall-investigate cleanup --targetRepoPath ~/git/mms --dryRun
+```
+
+See `src/evergreen_waterfall_triage/README.md` for details.
 
 ### Step 1: Authenticate with Evergreen
 
@@ -975,6 +989,31 @@ Discovers which Evergreen projects you've been working on based on recent patche
 
 **Parameters:**
 - `max_patches` (optional): Patches to scan (default: 50)
+
+---
+
+### `get_waterfall_failed_tasks_evergreen`
+
+Retrieves the most recent waterfall (flattened) version containing failed tasks across one or more build variants. Use this to quickly identify the latest failing revision in a project and get task IDs for deeper investigation.
+
+**Parameters:**
+- `project_identifier` (required): Evergreen project identifier (e.g. `mms`)
+- `variant` (optional): Single build variant to query (e.g. `ACPerf`)
+- `variants` (optional): List of build variants to query; merged with `variant` if both are provided
+- `waterfall_limit` (optional): Maximum number of recent versions to examine (default: 200)
+- `statuses` (optional): Task statuses to include (default: `["failed", "system-failed", "task-timed-out"]`; you may also add `setup-failed`)
+
+**Example Usage:**
+```json
+{
+  "tool": "get_waterfall_failed_tasks_evergreen",
+  "arguments": {
+    "project_identifier": "mms",
+    "variants": ["ACPerf", "enterprise-rhel-80-64-bit"],
+    "waterfall_limit": 50
+  }
+}
+```
 
 ---
 
@@ -2097,4 +2136,3 @@ This project follows the same license as the main Evergreen project.
 ## Version
 
 Current version: 0.4.2
-

@@ -311,6 +311,27 @@ query GetTaskTestResults(
 }
 """
 
+GET_WATERFALL_FAILED_TASKS = """
+query Waterfall($options: WaterfallOptions!, $tasksOptions: TaskFilterOptions!) {  
+  waterfall(options: $options) {  
+    flattenedVersions {  
+      id
+      branch
+      startTime
+      revision
+      finishTime
+      tasks(options: $tasksOptions) {
+        data {
+          id
+          displayName
+          status
+        }
+      }
+    }  
+  }
+}
+"""
+
 # Get inferred project identifiers from user's patches
 GET_INFERRED_PROJECT_IDS = """
 query InferredProjectIds($userId: String!, $limit: Int = 50, $page: Int = 0) {

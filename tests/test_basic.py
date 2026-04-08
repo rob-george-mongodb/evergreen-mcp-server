@@ -58,6 +58,8 @@ class TestImports(unittest.TestCase):
                 "GET_PATCH_FAILED_TASKS",
                 "GET_TASK_LOGS",
                 "GET_TASK_TEST_RESULTS",
+                "GET_WATERFALL_FAILED_TASKS",
+                "GET_INFERRED_PROJECT_IDS",
             ]
             for query in expected_queries:
                 self.assertTrue(

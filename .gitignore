@@ -2,6 +2,7 @@ src/evergreen/**
 src/evergreen_README.md
 src/.openapi-generator*
 
+.dsStore
 .claude/
 .claude-flow/
 .mcp.json
