@@ -69,6 +69,7 @@ def _normalize_version(
             task_id=raw_task.get("id") or "unknown-task-id",
             status=raw_task.get("status") or "unknown",
             version_id=raw_version.get("id") or "unknown-version-id",
+            the_actual_variant_we_should_stop_using_the_incomprehensible_display_name_ones=raw_task.get("buildVariant"),
             revision=raw_version.get("revision"),
             branch=raw_version.get("branch"),
             start_time=raw_version["startTime"],

@@ -29,10 +29,10 @@ def test_normalize_variant_history_filters_incomplete_versions_and_empty_tasks()
         raw_result={
             "waterfall": {
                 "flattenedVersions": [
-                    {"id": "v1", "startTime": None, "finishTime": "x", "tasks": {"data": [{"id": "t1", "displayName": "taskA", "status": "failed"}]}},
-                    {"id": "v2", "startTime": "x", "finishTime": None, "tasks": {"data": [{"id": "t2", "displayName": "taskA", "status": "failed"}]}},
+                    {"id": "v1", "startTime": None, "finishTime": "x", "tasks": {"data": [{"id": "t1", "displayName": "taskA", "buildVariant": "linux", "status": "failed"}]}},
+                    {"id": "v2", "startTime": "x", "finishTime": None, "tasks": {"data": [{"id": "t2", "displayName": "taskA", "buildVariant": "linux", "status": "failed"}]}},
                     {"id": "v3", "startTime": "x", "finishTime": "y", "tasks": {"data": []}},
-                    {"id": "v4", "revision": "abc", "branch": "main", "startTime": "2026-04-04T10:00:00Z", "finishTime": "2026-04-04T11:00:00Z", "tasks": {"data": [{"id": "t4", "displayName": "taskA", "status": "failed"}] }},
+                    {"id": "v4", "revision": "abc", "branch": "main", "startTime": "2026-04-04T10:00:00Z", "finishTime": "2026-04-04T11:00:00Z", "tasks": {"data": [{"id": "t4", "displayName": "taskA", "buildVariant": "linux", "status": "failed"}] }},
                 ]
             }
         },
@@ -66,6 +66,7 @@ def test_normalize_variant_history_raises_on_truncated_task_list():
                                     {
                                         "id": "t4",
                                         "displayName": "taskA",
+                                        "buildVariant": "linux",
                                         "status": "failed",
                                     }
                                 ],
@@ -93,7 +94,7 @@ def test_fetch_waterfall_history_queries_each_variant_with_full_status_universe(
                             "branch": "main",
                             "startTime": "2026-04-01T10:00:00Z",
                             "finishTime": "2026-04-01T11:00:00Z",
-                            "tasks": {"data": [{"id": "t1", "displayName": "taskA", "status": "failed"}]},
+                            "tasks": {"data": [{"id": "t1", "displayName": "taskA", "buildVariant": "linux", "status": "failed"}]},
                         }
                     ]
                 }

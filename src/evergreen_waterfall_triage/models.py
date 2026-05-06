@@ -40,6 +40,7 @@ class TaskOccurrence:
     task_id: str
     status: str
     version_id: str
+    the_actual_variant_we_should_stop_using_the_incomprehensible_display_name_ones: Optional[str] = None
     revision: Optional[str] = None
     branch: Optional[str] = None
     start_time: Optional[str] = None
@@ -57,6 +58,7 @@ class TaskOccurrence:
             "task_id": self.task_id,
             "status": self.status,
             "version_id": self.version_id,
+            "the_actual_variant_we_should_stop_using_the_incomprehensible_display_name_ones": self.the_actual_variant_we_should_stop_using_the_incomprehensible_display_name_ones,
             "revision": self.revision,
             "branch": self.branch,
             "start_time": self.start_time,
