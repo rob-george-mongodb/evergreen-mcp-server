@@ -1,10 +1,11 @@
 # Evergreen Waterfall Investigation Tools
 
-This package exposes three local CLIs:
+This package exposes four local CLIs:
 
 - `evergreen-waterfall-triage` to find open task failure streaks
 - `evergreen-waterfall-investigate` to launch and clean up per-failure investigations
 - `evergreen-restart-tasks` to restart failed Evergreen tasks in bulk
+- `evergreen-waterfall-download-artifacts` to download artifacts from failed tasks
 
 `evergreen-waterfall-triage` finds open task failure streaks on the Evergreen waterfall.
 
@@ -222,3 +223,99 @@ Writes JSON to stdout with results for each task:
 ```
 
 Returns exit code 0 if all tasks succeeded, 1 if any failed.
+
+## Artifact Download Tool
+
+`evergreen-waterfall-download-artifacts` downloads artifacts from failed tasks identified in waterfall triage output.
+
+### Purpose
+
+This tool extracts task IDs from the `streaks[].latest_failure.task_id` field in triage JSON and uses the `evergreen fetch artifacts` CLI to download them to a user-specified directory.
+
+### Usage
+
+Download all artifacts from failed tasks:
+
+```bash
+evergreen-waterfall-triage \
+  --projectIdentifier mms \
+  --variant ACWorkloadManagement \
+  | evergreen-waterfall-download-artifacts \
+    --artifactDownloadDir ./artifacts
+```
+
+Download specific artifacts only:
+
+```bash
+cat qaFailures.json | evergreen-waterfall-download-artifacts \
+  --artifactDownloadDir ./artifacts \
+  --artifact_name logs \
+  --artifact_name results
+```
+
+Use `--shallow` to skip downloading artifacts from dependency tasks:
+
+```bash
+cat qaFailures.json | evergreen-waterfall-download-artifacts \
+  --artifactDownloadDir ./artifacts \
+  --shallow
+```
+
+Read from a file instead of stdin:
+
+```bash
+evergreen-waterfall-download-artifacts \
+  --triageJson qaFailures.json \
+  --artifactDownloadDir ./artifacts
+```
+
+### Arguments
+
+- `--artifactDownloadDir` (required): Directory where artifacts will be downloaded. Each task's artifacts will be placed in a subdirectory named after the task ID.
+- `--triageJson`: Path to triage JSON file. If not provided, reads from stdin.
+- `--artifact_name`: Specific artifact name to download (can be specified multiple times). If not provided, downloads all artifacts for each task.
+- `--shallow`: Don't recursively download artifacts from dependency tasks.
+
+### Directory Structure
+
+Artifacts are organized by task ID:
+
+```
+<artifactDownloadDir>/
+├── task_id_1/
+│   ├── artifact1.tgz
+│   ├── artifact2.log
+│   └── ...
+├── task_id_2/
+│   ├── artifact1.tgz
+│   └── ...
+└── ...
+```
+
+### Output
+
+Writes JSON to stdout with download results:
+
+```json
+{
+  "success": true,
+  "message": "Downloaded artifacts for 11/11 tasks",
+  "task_count": 11,
+  "success_count": 11,
+  "download_dir": "/path/to/artifacts",
+  "results": [
+    {
+      "task_id": "task_abc123",
+      "success": true,
+      "download_dir": "/path/to/artifacts/task_abc123"
+    }
+  ]
+}
+```
+
+Returns exit code 0 if all downloads succeeded, 1 if any failed.
+
+### Requirements
+
+- The `evergreen` CLI must be installed and authenticated (`evergreen login`)
+- Network access to Evergreen artifact storage

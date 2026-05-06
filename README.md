@@ -20,6 +20,7 @@ A Model Context Protocol (MCP) server that provides access to the Evergreen CI/C
 - **Stepback Analysis**: Find failed mainline tasks that have undergone stepback bisection
 - **Waterfall Investigation CLI**: Launch one `opencode` investigation per open waterfall failure streak using git worktrees
 - **Investigation Cleanup CLI**: Remove generated investigation worktrees and optional branches safely
+- **Artifact Download CLI**: Download artifacts from failed tasks identified in waterfall triage output
 - **Authentication**: Secure OIDC-based authentication via `evergreen login`
 - **Async Operations**: Built on asyncio for efficient concurrent operations
 - **GraphQL + REST Integration**: Uses Evergreen's GraphQL API for metadata and REST API for full log content
@@ -34,6 +35,7 @@ This repo also ships local helper CLIs for waterfall-based E2E investigation:
 uv run evergreen-waterfall-triage --projectIdentifier mms --variant linux
 uv run evergreen-waterfall-investigate launch --triageJson qaFailures.json --targetRepoPath ~/git/mms --dryRun
 uv run evergreen-waterfall-investigate cleanup --targetRepoPath ~/git/mms --dryRun
+uv run evergreen-waterfall-download-artifacts --triageJson qaFailures.json --artifactDownloadDir ./artifacts
 ```
 
 See `src/evergreen_waterfall_triage/README.md` for details.

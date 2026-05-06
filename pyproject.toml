@@ -71,6 +71,7 @@ evergreen-mcp-server = "evergreen_mcp.server:main"
 evergreen-waterfall-triage = "evergreen_waterfall_triage.cli:main"
 evergreen-waterfall-investigate = "evergreen_waterfall_triage.investigation_cli:main"
 evergreen-restart-tasks = "evergreen_waterfall_triage.restart_cli:main"
+evergreen-waterfall-download-artifacts = "evergreen_waterfall_triage.artifact_download_cli:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
