@@ -159,7 +159,7 @@ class TestDownloadArtifactsForTask(unittest.TestCase):
                     task_id="task-123",
                     download_dir=download_dir,
                     artifact_names=["logs", "results"],
-                    shallow=True,
+                    shallow=True,  # ignored when using artifact_name
                 )
             
             assert result["success"] is True
@@ -168,7 +168,9 @@ class TestDownloadArtifactsForTask(unittest.TestCase):
             assert "--artifact_name" in call_args
             assert "logs" in call_args
             assert "results" in call_args
-            assert "--shallow" in call_args
+            # --shallow only applies to --artifacts, not --artifact_name
+            assert "--shallow" not in call_args
+            assert "--artifacts" not in call_args
 
     def test_handles_subprocess_error(self):
         with tempfile.TemporaryDirectory() as tmp:

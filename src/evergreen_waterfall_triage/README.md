@@ -273,8 +273,8 @@ evergreen-waterfall-download-artifacts \
 
 - `--artifactDownloadDir` (required): Directory where artifacts will be downloaded. Each task's artifacts will be placed in a subdirectory named after the task ID.
 - `--triageJson`: Path to triage JSON file. If not provided, reads from stdin.
-- `--artifact_name`: Specific artifact name to download (can be specified multiple times). If not provided, downloads all artifacts for each task.
-- `--shallow`: Don't recursively download artifacts from dependency tasks.
+- `--artifact_name`: Specific artifact name to download (can be specified multiple times). If provided, downloads only these artifacts. If not provided, downloads all artifacts using `--artifacts` flag.
+- `--shallow`: Don't recursively download artifacts from dependency tasks. Only applies when downloading all artifacts (no `--artifact_name` specified).
 
 ### Directory Structure
 

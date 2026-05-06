@@ -152,14 +152,16 @@ def download_artifacts_for_task(
         "fetch",
         "--task", task_id,
         "--dir", str(task_dir),
-        "--artifacts",
     ]
     
-    if shallow:
-        cmd.append("--shallow")
-    
-    for artifact_name in artifact_names:
-        cmd.extend(["--artifact_name", artifact_name])
+    # --artifacts and --artifact_name are mutually exclusive
+    if artifact_names:
+        for artifact_name in artifact_names:
+            cmd.extend(["--artifact_name", artifact_name])
+    else:
+        cmd.append("--artifacts")
+        if shallow:
+            cmd.append("--shallow")
     
     try:
         result = subprocess.run(
