@@ -73,6 +73,7 @@ evergreen-waterfall-investigate = "evergreen_waterfall_triage.investigation_cli:
 evergreen-restart-tasks = "evergreen_waterfall_triage.restart_cli:main"
 evergreen-waterfall-download-artifacts = "evergreen_waterfall_triage.artifact_download_cli:main"
 evergreen-add-patch-tasks = "evergreen_waterfall_triage.patch_cli:main"
+evergreen-add-variant-tasks = "evergreen_waterfall_triage.add_variant_tasks_cli:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
