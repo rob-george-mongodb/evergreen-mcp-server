@@ -2,7 +2,7 @@
 
 ## Problem Summary
 
-The Evergreen GraphQL schema has evolved, and 5 of 11 queries in `evergreen_queries.py` now fail with `GRAPHQL_VALIDATION_FAILED` errors against the live API. The primary breaking change is the removal of the `projectIdentifier` field from the `Patch` type — it has been replaced by `projectMetadata { identifier }`. A secondary issue is that `Patch.version` now returns `VersionLite` (not a scalar), requiring subfield selections.
+The Evergreen GraphQL schema has evolved, and 3 active queries in `evergreen_queries.py` now fail with `GRAPHQL_VALIDATION_FAILED` errors against the live API (2 additional dead/incomplete queries also have schema issues). The primary breaking change is the removal of the `projectIdentifier` field from the `Patch` type — it has been replaced by `projectMetadata { identifier }`. A secondary issue is that `Patch.version` now returns `VersionLite` (not a scalar), requiring subfield selections (affects only the dead `GET_PROJECT_PATCHES` query).
 
 ### Live API Test Results (2026-06-25)
 
@@ -239,85 +239,161 @@ query GetProjectPatches($projectId: String!, $limit: Int = 10) {
 
 ### Change 5: Update `failed_jobs_tools.py` field access
 
-Three functions access `patch.get("projectIdentifier")`. All must change to navigate the nested structure.
+Three functions access `patch.get("projectIdentifier")` at 5 call sites. All must change to navigate the nested structure.
 
-#### 5a. `fetch_user_recent_patches()` (L54-L55)
+**⚠️ Null-safety critical detail**: The Evergreen schema defines `projectMetadata: Project` (no `!`), meaning it can be `null`. Using `.get("projectMetadata", {})` is **insufficient** — when the API returns `{"projectMetadata": null}`, `.get()` returns `None` (not the default `{}`), and `None.get("identifier")` raises `AttributeError`. The correct pattern is `(patch.get("projectMetadata") or {}).get("identifier")`.
 
-**Before**:
+A helper function should be introduced to avoid repeating this pattern 5 times:
+
 ```python
+def _get_project_identifier(patch: dict) -> Optional[str]:
+    """Extract project identifier from patch data (projectMetadata.identifier)."""
+    return (patch.get("projectMetadata") or {}).get("identifier")
+```
+
+This helper is placed at the top of `failed_jobs_tools.py` and used at all 5 call sites.
+
+#### 5a. `fetch_user_recent_patches()` 
+
+**L54** — filter check:
+```python
+# Before:
 if project_id and patch.get("projectIdentifier") != project_id:
+# After:
+if project_id and _get_project_identifier(patch) != project_id:
 ```
 
-**After**:
+**L65** — field extraction:
 ```python
-if project_id and patch.get("projectMetadata", {}).get("identifier") != project_id:
-```
-
-Also at L81 where the field is extracted:
-**Before**:
-```python
+# Before:
 "project_identifier": patch.get("projectIdentifier"),
-```
-**After**:
-```python
-"project_identifier": patch.get("projectMetadata", {}).get("identifier"),
+# After:
+"project_identifier": _get_project_identifier(patch),
 ```
 
-#### 5b. `fetch_patch_failed_jobs()` (L152, L234)
+#### 5b. `fetch_patch_failed_jobs()`
 
-**Before** (L152):
+**L118** — validation check:
 ```python
+# Before:
 if project_id and patch.get("projectIdentifier") != project_id:
+    raise ValueError(...)
+# After:
+if project_id and _get_project_identifier(patch) != project_id:
     raise ValueError(...)
 ```
 
-**After**:
+**L131** — field extraction:
 ```python
-if project_id and patch.get("projectMetadata", {}).get("identifier") != project_id:
-    raise ValueError(...)
-```
-
-**Before** (L234):
-```python
+# Before:
 "project_identifier": patch.get("projectIdentifier"),
+# After:
+"project_identifier": _get_project_identifier(patch),
 ```
 
-**After**:
-```python
-"project_identifier": patch.get("projectMetadata", {}).get("identifier"),
-```
+#### 5c. `fetch_inferred_project_ids()`
 
-#### 5c. `fetch_inferred_project_ids()` (L453)
-
-**Before**:
+**L459** — aggregation key:
 ```python
+# Before:
 project_id = patch.get("projectIdentifier")
-```
-
-**After**:
-```python
-project_id = patch.get("projectMetadata", {}).get("identifier")
+# After:
+project_id = _get_project_identifier(patch)
 ```
 
 ### Change 6: Update test mock data shapes
 
-#### 6a. `tests/test_failed_jobs_tools.py`
+#### 6a. `tests/test_failed_jobs_tools.py` — 2 occurrences
 
-All mock patch objects that include `"projectIdentifier": "some-project"` must change to:
-```python
-"projectMetadata": {"identifier": "some-project"}
-```
+Replace `"projectIdentifier": "test-project"` with `"projectMetadata": {"identifier": "test-project"}` at:
 
-Specific locations to update (exact line numbers to be verified during implementation):
-- Mock data in `test_fetch_user_recent_patches_*` tests
-- Mock data in `test_fetch_patch_failed_jobs_*` tests
-- Mock data in `test_fetch_inferred_project_ids_*` tests
+- **L28**: `test_host_metadata_included_in_task_info` mock data
+- **L99**: `test_host_metadata_handles_missing_values` mock data
 
-#### 6b. `tests/test_project_inference.py`
+#### 6b. `tests/test_project_inference.py` — 3 occurrences
 
-Mock data for `get_inferred_project_ids` returns patches with `"projectIdentifier"` — must change to `"projectMetadata": {"identifier": ...}`.
+Replace `"projectIdentifier": "project-a"` / `"projectIdentifier": "project-b"` with `"projectMetadata": {"identifier": "project-a"}` / `"projectMetadata": {"identifier": "project-b"}` at:
+
+- **L22**: first `"project-a"` patch in `test_fetch_projects`
+- **L26**: second `"project-a"` patch in `test_fetch_projects`
+- **L31**: `"project-b"` patch in `test_fetch_projects`
 
 Field access in test assertions that check `result["projects"][i]["project_identifier"]` remain unchanged (the `fetch_inferred_project_ids` function still outputs `project_identifier` as its key).
+
+### Change 6.5: Add unit tests for project_id filtering logic (the core code being changed)
+
+The existing tests only verify host metadata extraction. The `project_id` filtering logic — the exact code this migration touches — has **zero test coverage**. Add new tests to `tests/test_failed_jobs_tools.py`:
+
+```python
+class TestProjectIdFiltering(unittest.IsolatedAsyncioTestCase):
+    """Test that project_id filtering works with projectMetadata.identifier."""
+
+    async def test_fetch_user_recent_patches_filters_by_project(self):
+        """Patches from other projects should be filtered out."""
+        mock_client = AsyncMock()
+        mock_client.get_user_recent_patches.return_value = [
+            {"id": "p1", "projectMetadata": {"identifier": "project-a"}, "githash": "a1",
+             "description": "desc", "author": "user", "authorDisplayName": "User",
+             "status": "failed", "createTime": "2025-01-01T00:00:00Z",
+             "patchNumber": 1, "versionFull": {"id": "v1", "status": "failed"}},
+            {"id": "p2", "projectMetadata": {"identifier": "project-b"}, "githash": "a2",
+             "description": "desc", "author": "user", "authorDisplayName": "User",
+             "status": "success", "createTime": "2025-01-01T00:00:00Z",
+             "patchNumber": 2, "versionFull": {"id": "v2", "status": "success"}},
+        ]
+        result = await fetch_user_recent_patches(
+            mock_client, "user", limit=10, project_id="project-a"
+        )
+        assert len(result["patches"]) == 1
+        assert result["patches"][0]["project_identifier"] == "project-a"
+
+    async def test_fetch_user_recent_patches_handles_null_project_metadata(self):
+        """Patches with null projectMetadata should not crash."""
+        mock_client = AsyncMock()
+        mock_client.get_user_recent_patches.return_value = [
+            {"id": "p1", "projectMetadata": None, "githash": "a1",
+             "description": "desc", "author": "user", "authorDisplayName": "User",
+             "status": "failed", "createTime": "2025-01-01T00:00:00Z",
+             "patchNumber": 1, "versionFull": {"id": "v1", "status": "failed"}},
+        ]
+        result = await fetch_user_recent_patches(
+            mock_client, "user", limit=10, project_id="project-a"
+        )
+        # Patch with null metadata should be filtered out, not crash
+        assert len(result["patches"]) == 0
+
+    async def test_fetch_patch_failed_jobs_raises_for_wrong_project(self):
+        """Should raise ValueError when patch belongs to different project."""
+        mock_client = AsyncMock()
+        mock_client.get_patch_failed_tasks.return_value = {
+            "id": "patch123", "patchNumber": 1, "githash": "abc",
+            "description": "desc", "author": "user", "authorDisplayName": "User",
+            "status": "failed", "createTime": "2025-01-01T00:00:00Z",
+            "projectMetadata": {"identifier": "wrong-project"},
+            "versionFull": {
+                "id": "v1", "revision": "abc", "author": "user",
+                "createTime": "2025-01-01T00:00:00Z", "status": "failed",
+                "tasks": {"count": 0, "data": []},
+            },
+        }
+        with self.assertRaises(ValueError):
+            await fetch_patch_failed_jobs(
+                mock_client, "patch123", project_id="expected-project"
+            )
+
+    async def test_fetch_inferred_project_ids_with_nested_metadata(self):
+        """Should correctly aggregate projects using projectMetadata.identifier."""
+        mock_client = AsyncMock()
+        mock_client.get_inferred_project_ids.return_value = [
+            {"projectMetadata": {"identifier": "project-a"}, "createTime": "2025-01-02T12:00:00Z", "id": "p1"},
+            {"projectMetadata": {"identifier": "project-a"}, "createTime": "2025-01-01T12:00:00Z", "id": "p2"},
+            {"projectMetadata": {"identifier": "project-b"}, "createTime": "2024-12-31T12:00:00Z", "id": "p3"},
+        ]
+        result = await fetch_inferred_project_ids(mock_client, "user")
+        assert result["total_projects"] == 2
+        assert result["projects"][0]["project_identifier"] == "project-a"
+        assert result["projects"][0]["patch_count"] == 2
+```
 
 ### Change 7: Add integration tests — `tests/test_graphql_live_queries.py` (NEW FILE)
 
@@ -603,11 +679,12 @@ Consider removing `GET_PROJECT_PATCHES` and `GET_PROJECT_BUILDS` from `evergreen
 
 | # | Risk / Question | Mitigation / Answer |
 |---|----------------|---------------------|
-| 1 | **`projectMetadata` could be null for some patches?** | The schema shows `projectMetadata: Project` (no `!`), so it could theoretically be null. Using `.get("projectMetadata", {}).get("identifier")` handles this gracefully, returning `None` for patches without project metadata. The existing code already handles `None` projectIdentifier in filter logic. |
+| 1 | **`projectMetadata` could be null for some patches?** | The schema shows `projectMetadata: Project` (no `!`), so it could be `null`. Using `.get("projectMetadata", {})` is **insufficient** — when API returns `{"projectMetadata": null}`, `.get()` returns `None` (not `{}`), and `None.get()` raises `AttributeError`. The plan uses a `_get_project_identifier()` helper with the pattern `(patch.get("projectMetadata") or {}).get("identifier")` which correctly handles both missing key and explicit `null` value. A unit test for the null case is included. |
 | 2 | **Are there other schema changes we haven't noticed?** | All 11 queries have been tested against the live API. Only the 3 `projectIdentifier` queries and the `version` subfield issue were found. No other field-level breakages exist. |
 | 3 | **Should the unused queries be removed now?** | Recommended as a separate follow-up to keep this change focused on the breaking schema fix. The dead queries (`GET_PROJECT_PATCHES`, `GET_PROJECT_BUILDS`) don't affect runtime. |
 | 4 | **`GET_PROJECT_PATCHES` has `version` that now requires subfields — but it's unused. Should we fix or remove?** | Remove it. It's never imported, never used, and the `version` field returning `VersionLite` is a secondary issue. Removing dead code is cleaner. |
 | 5 | **User ID format mismatch**: The OIDC endpoint uses `rob.george` as userId, not `rob.george@mongodb.com`. The `_user_from_jwt` function already strips the domain, so this is handled. However, the API key endpoint may use a different user ID format. | Existing code handles this correctly via `_user_from_jwt`. No change needed. |
+| 6 | **Integration test hardcoded patch ID may age out** | `TEST_PATCH_ID = "6a3c95198972470007910a4d"` could become inaccessible. Mitigated by the `RUN_INTEGRATION_TESTS=1` skip gate and the fact that this is for CI convenience, not a gate. Could be improved later to discover patch IDs at runtime from the user's recent patches. |
 
 ## Relevant Files / Research References
 
