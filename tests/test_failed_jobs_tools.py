@@ -4,7 +4,9 @@ import unittest
 from unittest.mock import AsyncMock
 
 from evergreen_mcp.failed_jobs_tools import (
+    fetch_inferred_project_ids,
     fetch_patch_failed_jobs,
+    fetch_user_recent_patches,
     fetch_task_logs,
     fetch_task_test_results,
 )
@@ -25,7 +27,7 @@ class TestFetchPatchFailedJobs(unittest.IsolatedAsyncioTestCase):
             "authorDisplayName": "Test User",
             "status": "failed",
             "createTime": "2025-01-01T12:00:00Z",
-            "projectIdentifier": "test-project",
+            "projectMetadata": {"identifier": "test-project"},
             "versionFull": {
                 "id": "version123",
                 "revision": "abc123",
@@ -96,7 +98,7 @@ class TestFetchPatchFailedJobs(unittest.IsolatedAsyncioTestCase):
             "authorDisplayName": "Test User",
             "status": "failed",
             "createTime": "2025-01-01T12:00:00Z",
-            "projectIdentifier": "test-project",
+            "projectMetadata": {"identifier": "test-project"},
             "versionFull": {
                 "id": "version123",
                 "revision": "abc123",
@@ -322,6 +324,76 @@ class TestHostMetadataFieldNames(unittest.TestCase):
         self.assertIn("host_id", expected_fields)
         self.assertIn("distro_id", expected_fields)
         self.assertIn("image_id", expected_fields)
+
+
+class TestProjectIdFiltering(unittest.IsolatedAsyncioTestCase):
+    """Test that project_id filtering works with projectMetadata.identifier."""
+
+    async def test_fetch_user_recent_patches_filters_by_project(self):
+        """Patches from other projects should be filtered out."""
+        mock_client = AsyncMock()
+        mock_client.get_user_recent_patches.return_value = [
+            {"id": "p1", "projectMetadata": {"identifier": "project-a"}, "githash": "a1",
+             "description": "desc", "author": "user", "authorDisplayName": "User",
+             "status": "failed", "createTime": "2025-01-01T00:00:00Z",
+             "patchNumber": 1, "versionFull": {"id": "v1", "status": "failed"}},
+            {"id": "p2", "projectMetadata": {"identifier": "project-b"}, "githash": "a2",
+             "description": "desc", "author": "user", "authorDisplayName": "User",
+             "status": "success", "createTime": "2025-01-01T00:00:00Z",
+             "patchNumber": 2, "versionFull": {"id": "v2", "status": "success"}},
+        ]
+        result = await fetch_user_recent_patches(
+            mock_client, "user", page_size=10, project_id="project-a"
+        )
+        assert len(result["patches"]) == 1
+        assert result["patches"][0]["project_identifier"] == "project-a"
+
+    async def test_fetch_user_recent_patches_handles_null_project_metadata(self):
+        """Patches with null projectMetadata should not crash."""
+        mock_client = AsyncMock()
+        mock_client.get_user_recent_patches.return_value = [
+            {"id": "p1", "projectMetadata": None, "githash": "a1",
+             "description": "desc", "author": "user", "authorDisplayName": "User",
+             "status": "failed", "createTime": "2025-01-01T00:00:00Z",
+             "patchNumber": 1, "versionFull": {"id": "v1", "status": "failed"}},
+        ]
+        result = await fetch_user_recent_patches(
+            mock_client, "user", page_size=10, project_id="project-a"
+        )
+        # Patch with null metadata should be filtered out, not crash
+        assert len(result["patches"]) == 0
+
+    async def test_fetch_patch_failed_jobs_raises_for_wrong_project(self):
+        """Should raise ValueError when patch belongs to different project."""
+        mock_client = AsyncMock()
+        mock_client.get_patch_failed_tasks.return_value = {
+            "id": "patch123", "patchNumber": 1, "githash": "abc",
+            "description": "desc", "author": "user", "authorDisplayName": "User",
+            "status": "failed", "createTime": "2025-01-01T00:00:00Z",
+            "projectMetadata": {"identifier": "wrong-project"},
+            "versionFull": {
+                "id": "v1", "revision": "abc", "author": "user",
+                "createTime": "2025-01-01T00:00:00Z", "status": "failed",
+                "tasks": {"count": 0, "data": []},
+            },
+        }
+        with self.assertRaises(ValueError):
+            await fetch_patch_failed_jobs(
+                mock_client, "patch123", project_id="expected-project"
+            )
+
+    async def test_fetch_inferred_project_ids_with_nested_metadata(self):
+        """Should correctly aggregate projects using projectMetadata.identifier."""
+        mock_client = AsyncMock()
+        mock_client.get_inferred_project_ids.return_value = [
+            {"projectMetadata": {"identifier": "project-a"}, "createTime": "2025-01-02T12:00:00Z", "id": "p1"},
+            {"projectMetadata": {"identifier": "project-a"}, "createTime": "2025-01-01T12:00:00Z", "id": "p2"},
+            {"projectMetadata": {"identifier": "project-b"}, "createTime": "2024-12-31T12:00:00Z", "id": "p3"},
+        ]
+        result = await fetch_inferred_project_ids(mock_client, "user")
+        assert result["total_projects"] == 2
+        assert result["projects"][0]["project_identifier"] == "project-a"
+        assert result["projects"][0]["patch_count"] == 2
 
 
 if __name__ == "__main__":

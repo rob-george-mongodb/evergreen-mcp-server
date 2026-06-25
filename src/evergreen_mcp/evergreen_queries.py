@@ -72,36 +72,6 @@ query GetProjectSettings($projectId: String!) {
 }
 """
 
-# Query to get recent patches for a project
-GET_PROJECT_PATCHES = """
-query GetProjectPatches($projectId: String!, $limit: Int = 10) {
-  project(projectIdentifier: $projectId) {
-    patches(patchesInput: {limit: $limit}) {
-      patches {
-        id
-        description
-        author
-        createTime
-        status
-        version
-      }
-    }
-  }
-}
-"""
-
-# Query to get builds for a project
-GET_PROJECT_BUILDS = """
-query GetProjectBuilds($projectId: String!, $limit: Int = 10) {
-  project(projectIdentifier: $projectId) {
-    id
-    displayName
-    # Note: This would need to be adjusted based on actual schema structure
-    # The merged-schema.graphql should be consulted for exact field names
-  }
-}
-"""
-
 # Get recent patches for the authenticated user (with pagination)
 GET_USER_RECENT_PATCHES = """
 query GetUserRecentPatches($userId: String!, $limit: Int = 10, $page: Int = 0) {
@@ -122,7 +92,9 @@ query GetUserRecentPatches($userId: String!, $limit: Int = 10, $page: Int = 0) {
         status
         createTime
         patchNumber
-        projectIdentifier
+        projectMetadata {
+          identifier
+        }
         versionFull {
           id
           status
@@ -145,7 +117,9 @@ query GetPatchFailedTasks($patchId: String!) {
     status
     createTime
     patchNumber
-    projectIdentifier
+    projectMetadata {
+      identifier
+    }
     versionFull {
       id
       revision
@@ -327,7 +301,9 @@ query InferredProjectIds($userId: String!, $limit: Int = 50, $page: Int = 0) {
       patches {
         id
         createTime
-        projectIdentifier
+        projectMetadata {
+          identifier
+        }
       }
     }
   }
